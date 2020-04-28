@@ -15,12 +15,15 @@
 					<Add option="-g" />
 					<Add directory="../../../../Program Files (x86)/CodeBlocks/SDL2-2.0.12/i686-w64-mingw32/include/SDL2" />
 					<Add directory="../../../../Program Files (x86)/CodeBlocks/SDL2_image-2.0.5/i686-w64-mingw32/include/SDL2" />
+					<Add directory="../../../../Program Files (x86)/CodeBlocks/SDL2_mixer-2.0.4/i686-w64-mingw32/include/SDL2" />
 				</Compiler>
 				<Linker>
 					<Add option="-lmingw32 -lSDL2main -lSDL2" />
 					<Add option="-lSDL2_image" />
+					<Add option="-lSDL2_mixer" />
 					<Add directory="../../../../Program Files (x86)/CodeBlocks/SDL2-2.0.12/i686-w64-mingw32/lib" />
 					<Add directory="../../../../Program Files (x86)/CodeBlocks/SDL2_image-2.0.5/i686-w64-mingw32/lib" />
+					<Add directory="../../../../Program Files (x86)/CodeBlocks/SDL2_mixer-2.0.4/i686-w64-mingw32/lib" />
 				</Linker>
 			</Target>
 			<Target title="Release">

@@ -1,6 +1,12 @@
 # depslib dependency file v1.0
-1587106511 source:c:\users\admin\desktop\game2048\main.cpp
-	<bits/stdc++.h>
+1588084459 source:c:\users\admin\desktop\game2048\main.cpp
+	<SDL.h>
+	<SDL_image.h>
+	<SDL_mixer.h>
+	<cstdlib>
+	<ctime>
+	<vector>
+	<string>
 
 1583890677 c:\program files (x86)\codeblocks\sdl2-2.0.12\i686-w64-mingw32\include\sdl2\sdl.h
 	"SDL_main.h"
@@ -358,6 +364,15 @@
 
 1561870368 c:\program files (x86)\codeblocks\sdl2_image-2.0.5\i686-w64-mingw32\include\sdl2\sdl_image.h
 	"SDL.h"
+	"SDL_version.h"
+	"begin_code.h"
+	"close_code.h"
+
+1540997992 c:\program files (x86)\codeblocks\sdl2_mixer-2.0.4\i686-w64-mingw32\include\sdl2\sdl_mixer.h
+	"SDL_stdinc.h"
+	"SDL_rwops.h"
+	"SDL_audio.h"
+	"SDL_endian.h"
 	"SDL_version.h"
 	"begin_code.h"
 	"close_code.h"

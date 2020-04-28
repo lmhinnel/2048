@@ -1,94 +1,319 @@
-#include <bits/stdc++.h>
+#include <SDL.h>
+#include <SDL_image.h>
+#include <SDL_mixer.h>
+#include <cstdlib>
+#include <ctime>
+#include <vector>
+#include <string>
 using namespace std;
 
 // Game tutorial: Random -> Check movement -> Draw board -> Repeat. If end game, then end :>
 
-int Board[5][5], TempBoard[5][5], r, x, y, score = 0;
-vector <int> DoMove;
-char c;
-const int aRandom[] = {2, 2, 2, 2, 2, 4};
-bool GameOver = 0, FullBoard = 0, StillMove = 0;
+const int boardSize = 4; // Size of board
+const int spriteSize = 130; // Size of sprite for both in picture and in window
+const int window_width = 700;
+const int window_height = 760;
+const int aRandom[] = {2, 2, 2, 2, 2, 4}; // In order to make the times random 2 more than random 4
+// const int value[] = {2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536}; // Available value of a box
+const string windowTitle = "2048 super kool"; // Name of window
+const string backgroundPath = "bg.png"; // Background path
+const string spritePath = "sprite.png"; // Sprite path
+const string buttonPath = "button.png"; // Button start game path
 
-void inDoMove();
-void moveU();
-void moveD();
-void moveL();
-void moveR();
 
-void RandBoard();
-void StoreBoard();
-void Movement();
-bool CheckMove();
-void DrawBoard();
-void CheckBoard();
-
-int main()
+struct Game
 {
-    cout << "Start the game?\n";
-    string str; getline(cin, str);
-    if (str[0] == 'N' || str[0] == 'n' || str[0] == '0') return 0;
-    srand(time(NULL));
-    for (int i = 0; i < 2; i++) RandBoard();
-    while (GameOver == 0)
-    {
-        system("cls");
-        if (FullBoard == 0) RandBoard();
-        CheckBoard();
-        if (GameOver == 1) break;
-        DrawBoard();
-        cout << "Chose 8(up), 2(down), 4(left), 6(right) : ";
-        cin >> c;
-        while (c != '8' && c != '2' && c != '4' && c != '6')
-        {
-            cout << "\nPlease choose again: ";
-            cin >> c;
-        }
-        cout << endl;
+    int Board[boardSize + 1][boardSize + 1]; // A square board from 1 to 4
+    int TempBoard[boardSize + 1][boardSize + 1]; // Store the board before doing move
+    int x, y; // Location of a box in Board
+    long long score;
+    int r; // A random number from aRandom to pick for a box
+    vector <int> DoMove; // Step by step for each column or row
+};
 
-        while (1)
+struct Graphic
+{
+    SDL_Window* Window; // Window
+    SDL_Renderer* renderer; // To draw into Window
+    SDL_Texture* background; // Background image
+    SDL_Texture* spriteTexture; // Sprites image
+    vector <SDL_Rect> spriteRec; // Sprite location in sprite.png
+    vector <SDL_Rect> winRec; // Sprite location in Window
+    SDL_Event event; // Event include space to exit, up, down, left, right
+};
+
+// Initial Game
+SDL_Texture* createBackground (SDL_Renderer* renderer, string path); // Turn background.png to texture
+SDL_Texture* createSprtieTexture(SDL_Renderer* renderer, string path); // Turn sprite.png to texture
+void initSpriteRects(vector<SDL_Rect>& spriteRec, vector <SDL_Rect>& winRec); // Make spriteRec
+void err(string& m);
+
+// Create game when start a new game
+void RandBoard(Game& game); // <necessary>
+void createGame(Game& game); // <necessary>
+bool initGraphic(Graphic& g); // Create everything <necessary>
+
+// Draw board
+void drawGame(Game & game, Graphic& g); // <necessary>
+
+// Check the board if still have an available move after creating a random number
+bool GameOver(Game& game); // <necessary>
+
+// Solving
+void StoreBoard(Game& game); // Store board into TempBoard before moving
+
+void inDoMove(vector <int>& DoMove, long long& score); // Sort each row or column in each move
+void moveU(Game& game);
+void moveD(Game& game);
+void moveL(Game& game);
+void moveR(Game& game);
+
+bool CheckMove(Game& game); // Check if after moving the board is different or not
+
+void initEvent(Game& game, SDL_Event& event); // <necessary>
+
+// When end game
+void close(Graphic& g); // Destroy everything <necessary>
+
+int main(int agrc, char* agrv[])
+{
+    Game game;
+    Graphic g;
+    srand(time(NULL));
+    if (!initGraphic(g))
+    {
+        close(g);
+        return EXIT_FAILURE;
+    }
+
+    createGame(game);
+    bool moved = 1;
+    while (true)
+    {
+        if(GameOver(game) == 1) break;
+        if(moved == 1)
         {
-            StoreBoard();
-            if (CheckMove() == 1) break;
-            else
+            RandBoard(game);
+            moved = 0;
+        }
+        drawGame(game, g);
+        while (SDL_PollEvent(&g.event) != 0)
+        {
+            if (g.event.type == SDL_QUIT)
             {
-                cout << "\nPlease chose again: ";
-                cin >> c;
+
+                close(g);
+                return 0;
+            }
+            if (g.event.type == SDL_KEYDOWN)
+            {
+                initEvent(game, g.event);
+                moved = CheckMove(game);
             }
         }
-        CheckBoard();
     }
-    cout << "End game!\n";
-    DrawBoard();
-    cout << "Please cin '0' to return!\n";
-    cin >> c;
-    while(c != '0')
-    {
-        cout << "Write '0' please ->.->\n";
-        cin >> c;
-    }
+    SDL_Delay(2000);
+    close(g);
     return 0;
 }
 
-// Create a random number
-void RandBoard()
+
+// Initial Game
+SDL_Texture* createBackground (SDL_Renderer* renderer, string path)
 {
-    r = rand() % 16 + 1;
-    x = (r - 1) / 4 + 1, y = (r - 1) % 4 + 1;
-    while (Board[x][y] != 0)
+    SDL_Surface* sur = IMG_Load(path.c_str());
+    if (sur == NULL)
     {
-        r = rand() % 16 + 1;
-        x = (r - 1) / 4 + 1;
-        y = (r - 1) % 4 + 1;
+        string m = SDL_GetError();
+        err(m);
+        return NULL;
     }
-    Board[x][y] = aRandom[rand() % 6];
+    SDL_Texture* tex = SDL_CreateTextureFromSurface(renderer, sur);
+    SDL_FreeSurface(sur);
+    return tex;
+}
+SDL_Texture* createSprtieTexture(SDL_Renderer* renderer, string path)
+{
+    SDL_Surface* sur = IMG_Load(path.c_str());
+    if (sur == NULL)
+    {
+        string m = SDL_GetError();
+        err(m);
+        return NULL;
+    }
+    SDL_Texture* tex = SDL_CreateTextureFromSurface(renderer, sur);
+    SDL_FreeSurface(sur);
+    return tex;
+}
+void initSpriteRects(vector<SDL_Rect>& spriteRec, vector <SDL_Rect>& winRec)
+{
+    SDL_Rect rec = {0, 0, spriteSize, spriteSize};
+
+    for (int i = 0; i <= (spriteSize - 1) * boardSize; i += spriteSize)
+    for (int j = 0; j <= (spriteSize - 1) * boardSize; j += spriteSize)
+    {
+        rec.x = j;
+        rec.y = i;
+        spriteRec.push_back(rec);
+    }
+
+    int space = (window_width - boardSize * spriteSize) / 2;
+    for (int i = space; i < window_width - space; i += spriteSize)
+    for (int j = space; j < window_width - space; j += spriteSize)
+    {
+        rec.x = j;
+        rec.y = i;
+        winRec.push_back(rec);
+    }
+}
+void err(string& m)
+{
+    SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR,"ERROR", m.c_str(), NULL);
 }
 
-// Move in DoMove
-void inDoMove()
+// Create game when start a new game
+void RandBoard(Game& game)
+{
+    game.r = rand() % (boardSize * boardSize) + 1;
+    game.x = (game.r - 1) / boardSize + 1; game.y = (game.r - 1) % boardSize + 1;
+    while (game.Board[game.x][game.y] != 0)
+    {
+        game.r = rand() % (boardSize * boardSize) + 1;
+        game.x = (game.r - 1) / boardSize + 1;
+        game.y = (game.r - 1) % boardSize + 1;
+    }
+    game.Board[game.x][game.y] = aRandom[rand() % 6];
+}
+void createGame(Game& game)
+{
+    for (int i = 0; i <= boardSize; i++)
+        for (int j = 0; j <= boardSize; j++)
+    {
+        game.Board[i][j] = 0;
+        game.TempBoard[i][j] = 0;
+    }
+    RandBoard(game);
+    game.score = 0;
+}
+bool initGraphic(Graphic& g)
+{
+    g.Window = NULL;
+    g.renderer = NULL;
+    g.background = NULL;
+    g.spriteTexture = NULL;
+    if (SDL_Init(SDL_INIT_VIDEO) != 0)
+    {
+        string m = SDL_GetError();
+        err(m);
+        return false;
+    }
+    if(!(IMG_Init(IMG_INIT_PNG) & IMG_INIT_PNG))
+    {
+        string m = SDL_GetError();
+        err(m);
+        return false;
+    }
+    g.Window = SDL_CreateWindow(windowTitle.c_str(),SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, window_width, window_height, SDL_WINDOW_SHOWN);
+    if (g.Window == NULL)
+    {
+        string m = SDL_GetError();
+        err(m);
+        return false;
+    }
+    g.renderer = SDL_CreateRenderer(g.Window, - 1, SDL_RENDERER_ACCELERATED);
+    if (g.renderer == NULL)
+    {
+        string m = SDL_GetError();
+        err(m);
+        return false;
+    }
+    g.background = createBackground(g.renderer, backgroundPath);
+    g.spriteTexture = createSprtieTexture(g.renderer, spritePath);
+    if (g.background == NULL || g.spriteTexture == NULL)
+    {
+        string m = SDL_GetError();
+        err(m);
+        return false;
+    }
+    initSpriteRects(g.spriteRec, g.winRec);
+    return true;
+}
+
+// Draw board
+void drawGame(Game& game, Graphic& g)
+{
+    SDL_RenderClear(g.renderer);
+    SDL_Rect rec = {0, 0, window_width, window_height};
+    SDL_RenderCopy(g.renderer, g.background, &rec, NULL);
+    bool MTP;
+    int pos = 0;
+    for (int i = 1; i <= boardSize; i++)
+    for (int j = 1; j <= boardSize; j++)
+    {
+        MTP = 0;
+        switch (game.Board[i][j])
+        {
+            case 2:      rec = g.spriteRec[0];   break;
+            case 4:      rec = g.spriteRec[1];   break;
+            case 8:      rec = g.spriteRec[2];   break;
+            case 16:     rec = g.spriteRec[3];   break;
+            case 32:     rec = g.spriteRec[4];   break;
+            case 64:     rec = g.spriteRec[5];   break;
+            case 128:    rec = g.spriteRec[6];   break;
+            case 256:    rec = g.spriteRec[7];   break;
+            case 512:    rec = g.spriteRec[8];   break;
+            case 1024:   rec = g.spriteRec[9];   break;
+            case 2048:   rec = g.spriteRec[10];  break;
+            case 4096:   rec = g.spriteRec[11];  break;
+            case 8192:   rec = g.spriteRec[12];  break;
+            case 16384:  rec = g.spriteRec[13];  break;
+            case 32768:  rec = g.spriteRec[14];  break;
+            case 65536:  rec = g.spriteRec[15];  break;
+            default : MTP = 1;
+        }
+        pos = i * boardSize - (boardSize - j) - 1;
+        if (MTP == 0) SDL_RenderCopy(g.renderer, g.spriteTexture, &rec, &g.winRec[pos]);
+    }
+    SDL_RenderPresent(g.renderer);
+}
+
+bool GameOver(Game& game)
+{
+    // Check available space
+    for (int i = 1; i <= boardSize; i++)
+    {
+        for (int j = 1; j <= boardSize; j++)
+        if (game.Board[i][j] == 0) // If this box is empty then the board is not full yet, return GameOver = False
+        {
+            return false;
+        }
+    }
+    // Check if there are two boxes have a same number when the board is full
+    for (int i = boardSize; i >= 1; i--)
+    {
+        for (int j = boardSize; j >= 1; j--)
+        {
+            if (game.Board[i][j] == game.Board[i - 1][j] || game.Board[i][j] == game.Board[i][j - 1])
+            {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+void StoreBoard(Game& game)
+{
+    for (int i = 1; i <= boardSize; i++)
+        for (int j = 1; j <= boardSize; j++) game.TempBoard[i][j] = game.Board[i][j];
+
+}
+
+void inDoMove(vector <int>& DoMove, long long& score)
 {
     if (DoMove.size() >= 2)
     {
-        if (DoMove.size() < 4) DoMove.resize(4, 0);
+        if (DoMove.size() < boardSize) DoMove.resize(boardSize, 0);
         for (int i = 0; i < DoMove.size(); i++)
         if (DoMove[i] == 0) break;
         else if (DoMove[i] == DoMove[i + 1])
@@ -101,124 +326,73 @@ void inDoMove()
     }
     else DoMove.resize(4, 0);
 }
-
-// Movement and reload the board
-void moveU()
+void moveU(Game& game)
 {
-    for (int j = 1; j <= 4; j++)
+    for (int j = 1; j <= boardSize; j++)
     {
-        for (int i = 1; i <= 4; i++) if (Board[i][j] != 0) DoMove.push_back(Board[i][j]);
-        inDoMove();
-        for (int i = 1; i <= 4; i++) Board[i][j] = DoMove[i - 1];
-        DoMove.clear();
+        for (int i = 1; i <= boardSize; i++) if (game.Board[i][j] != 0) game.DoMove.push_back(game.Board[i][j]);
+        inDoMove(game.DoMove, game.score);
+        for (int i = 1; i <= boardSize; i++) game.Board[i][j] = game.DoMove[i - 1];
+        game.DoMove.clear();
     }
 }
-void moveD()
+void moveD(Game& game)
 {
-    for (int j = 1; j <= 4; j++)
+    for (int j = 1; j <= boardSize; j++)
     {
-        for (int i = 4; i >= 1; i--) if (Board[i][j] != 0) DoMove.push_back(Board[i][j]);
-        inDoMove();
-        for (int i = 4; i >= 1; i--) Board[i][j] = DoMove[4 - i];
-        DoMove.clear();
+        for (int i = boardSize; i >= 1; i--) if (game.Board[i][j] != 0) game.DoMove.push_back(game.Board[i][j]);
+        inDoMove(game.DoMove, game.score);
+        for (int i = boardSize; i >= 1; i--) game.Board[i][j] = game.DoMove[4 - i];
+        game.DoMove.clear();
     }
 }
-void moveL()
+void moveL(Game& game)
 {
-    for (int i = 1; i <= 4; i++)
+    for (int i = 1; i <= boardSize; i++)
     {
-        for (int j = 1; j <= 4; j++) if (Board[i][j] != 0) DoMove.push_back(Board[i][j]);
-        inDoMove();
-        for (int j = 1; j <= 4; j++) Board[i][j] = DoMove[j - 1];
-        DoMove.clear();
+        for (int j = 1; j <= boardSize; j++) if (game.Board[i][j] != 0) game.DoMove.push_back(game.Board[i][j]);
+        inDoMove(game.DoMove, game.score);
+        for (int j = 1; j <= boardSize; j++) game.Board[i][j] = game.DoMove[j - 1];
+        game.DoMove.clear();
     }
 }
-void moveR()
+void moveR(Game& game)
 {
-    for (int i = 1; i <= 4; i++)
+    for (int i = 1; i <= boardSize; i++)
     {
-        for (int j = 4; j >= 1; j--) if (Board[i][j] != 0) DoMove.push_back(Board[i][j]);
-        inDoMove();
-        for (int j = 4; j >= 1; j--) Board[i][j] = DoMove[4 - j];
-        DoMove.clear();
+        for (int j = boardSize; j >= 1; j--) if (game.Board[i][j] != 0) game.DoMove.push_back(game.Board[i][j]);
+        inDoMove(game.DoMove, game.score);
+        for (int j = boardSize; j >= 1; j--) game.Board[i][j] = game.DoMove[boardSize - j];
+        game.DoMove.clear();
     }
 }
-void Movement()
+bool CheckMove(Game& game)
 {
-    if (c == '8') moveU(); // Move up
-    if (c == '2') moveD(); // Move down
-    if (c == '4') moveL(); // Move left
-    if (c == '6') moveR(); // Move right
-}
-
-// As if the move is available
-void StoreBoard()
-{
-    for (int i = 1; i <= 4; i++)
-        for (int j = 1; j <= 4; j++) TempBoard[i][j] = Board[i][j];
-
-}
-bool CheckMove()
-{
-    Movement();
-    for (int i = 1; i <= 4; i++)
-        for (int j = 1; j <= 4; j++) if (Board[i][j] != TempBoard[i][j]) return 1;
+    for (int i = 1; i <= boardSize; i++)
+        for (int j = 1; j <= boardSize; j++) if (game.Board[i][j] != game.TempBoard[i][j]) return 1;
     return 0;
 }
 
-// Draw the board and the score
-void DrawBoard()
+void initEvent(Game& game, SDL_Event& event)
 {
-    cout << "_________________________" << endl;
-    for (int i = 1; i <= 4; i++)
+    StoreBoard(game);
+    switch (event.key.keysym.sym)
     {
-        for (int j = 1; j <= 4; j++)
-            cout << "|" << setw(4) << Board[i][j] << " ";
-        cout << "|\n";
+        case SDLK_UP:       moveU(game); break;
+        case SDLK_DOWN:     moveD(game); break;
+        case SDLK_LEFT:     moveL(game); break;
+        case SDLK_RIGHT:    moveR(game); break;
+        default: return;
     }
-    cout << "_________________________\n";
-    cout << "Score: " << score << endl << endl;
 }
 
-// Check endgame yet, fullboard yet
-void CheckBoard()
+void close(Graphic& g)
 {
-    FullBoard = 1;
-    StillMove = 0;
-    // Check available space
-    for (int i = 1; i <= 4; i++)
-    {
-        for (int j = 1; j <= 4; j++)
-        if (Board[i][j] == 0)
-        {
-            FullBoard = 0;
-            break;
-        }
-        if (FullBoard == 0) break;
-    }
-    // Check available move
-    if (FullBoard == 1)
-    {
-        for (int i = 1; i <= 3; i++)
-        {
-            for (int j = 1; j <= 3; j++)
-            {
-                if (Board[i][j] == Board[i + 1][j] || Board[i][j] == Board[i][j + 1])
-                {
-                    StillMove = 1; break;
-                }
-            }
-            if (StillMove == 1) break;
-        }
-        for (int i = 1; i <= 3; i++)
-        {
-            if (Board[i][4] == Board[i + 1][4] || Board[4][i] == Board[4][i + 1])
-            {
-                StillMove = 1; break;
-            }
-        }
-    }
-    else StillMove = 1;
+    SDL_DestroyTexture(g.background);
+    SDL_DestroyTexture(g.spriteTexture);
+    SDL_DestroyRenderer(g.renderer);
+    SDL_DestroyWindow(g.Window);
 
-    GameOver = (StillMove == 1)? false : true;
+    IMG_Quit();
+    SDL_Quit();
 }
