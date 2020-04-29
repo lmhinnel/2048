@@ -1,25 +1,30 @@
 #include <SDL.h>
 #include <SDL_image.h>
 #include <SDL_mixer.h>
+#include <SDL_ttf.h>
 #include <cstdlib>
 #include <ctime>
 #include <vector>
 #include <string>
+#include <sstream>
 using namespace std;
 
 // Game tutorial: Random -> Check movement -> Draw board -> Repeat. If end game, then end :>
 
 const int boardSize = 4; // Size of board
-const int spriteSize = 130; // Size of sprite for both in picture and in window
-const int window_width = 700;
-const int window_height = 760;
+const int spriteSize = 130; // Size of source sprite
+const int spriteWin = 100; //
+const int window_width = 500;
+const int window_height = 700;
 const int aRandom[] = {2, 2, 2, 2, 2, 4}; // In order to make the times random 2 more than random 4
+const SDL_Color White = {255, 255, 255, 255};
+const SDL_Rect textRec = {window_width / 2 - 50, window_height - 100, 100, 70};
 // const int value[] = {2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536}; // Available value of a box
 const string windowTitle = "2048 super kool"; // Name of window
 const string backgroundPath = "bg.png"; // Background path
 const string spritePath = "sprite.png"; // Sprite path
-const string buttonPath = "button.png"; // Button start game path
-
+const string musicPath = "remon.ogg"; // Music path
+const string fontpath = "circle3d.ttf"; // Font path
 
 struct Game
 {
@@ -37,6 +42,9 @@ struct Graphic
     SDL_Renderer* renderer; // To draw into Window
     SDL_Texture* background; // Background image
     SDL_Texture* spriteTexture; // Sprites image
+    Mix_Music* music;
+    TTF_Font* font;
+    SDL_Texture* text;
     vector <SDL_Rect> spriteRec; // Sprite location in sprite.png
     vector <SDL_Rect> winRec; // Sprite location in Window
     SDL_Event event; // Event include space to exit, up, down, left, right
@@ -53,6 +61,8 @@ void RandBoard(Game& game); // <necessary>
 void createGame(Game& game); // <necessary>
 bool initGraphic(Graphic& g); // Create everything <necessary>
 
+// Draw score
+void drawScore(int& score, Graphic& g);
 // Draw board
 void drawGame(Game & game, Graphic& g); // <necessary>
 
@@ -88,6 +98,7 @@ int main(int agrc, char* agrv[])
 
     createGame(game);
     bool moved = 1;
+    Mix_PlayMusic(g.music, -1);
     while (true)
     {
         if(GameOver(game) == 1) break;
@@ -156,10 +167,10 @@ void initSpriteRects(vector<SDL_Rect>& spriteRec, vector <SDL_Rect>& winRec)
         rec.y = i;
         spriteRec.push_back(rec);
     }
-
-    int space = (window_width - boardSize * spriteSize) / 2;
-    for (int i = space; i < window_width - space; i += spriteSize)
-    for (int j = space; j < window_width - space; j += spriteSize)
+    rec = {0, 0, spriteWin, spriteWin};
+    int space = (window_width - boardSize * spriteWin) / 2;
+    for (int i = space; i < window_width - space; i += spriteWin)
+    for (int j = space; j < window_width - space; j += spriteWin)
     {
         rec.x = j;
         rec.y = i;
@@ -201,7 +212,9 @@ bool initGraphic(Graphic& g)
     g.renderer = NULL;
     g.background = NULL;
     g.spriteTexture = NULL;
-    if (SDL_Init(SDL_INIT_VIDEO) != 0)
+    g.music = NULL;
+    g.font = NULL;
+    if (SDL_Init(SDL_INIT_EVERYTHING) != 0)
     {
         string m = SDL_GetError();
         err(m);
@@ -235,17 +248,52 @@ bool initGraphic(Graphic& g)
         err(m);
         return false;
     }
+    if (Mix_OpenAudio(MIX_DEFAULT_FREQUENCY, MIX_DEFAULT_FORMAT, MIX_DEFAULT_CHANNELS, 4096) != 0) // Open audio
+    {
+        string m = SDL_GetError();
+        err(m);
+        return false;
+    }
+    g.music = Mix_LoadMUS(musicPath.c_str()); // Create music for game
+    if (g.music == NULL)
+    {
+        string m = SDL_GetError();
+        err(m);
+        return false;
+    }
+    if (TTF_Init() != 0)
+    {
+        string m = SDL_GetError();
+        err(m);
+        return false;
+    }
+    g.font = TTF_OpenFont(fontpath.c_str(), 24);
+    if (g.font == NULL)
+    {
+        string m = SDL_GetError();
+        err(m);
+        return false;
+    }
     initSpriteRects(g.spriteRec, g.winRec);
     return true;
 }
 
 // Draw board
+void drawScore (long long& score, Graphic& g)
+{
+    SDL_Surface* sur = NULL;
+    stringstream ss; ss << score;
+    string out = "Score: " + ss.str();
+    sur = TTF_RenderText_Solid(g.font, out.c_str(), White);
+    g.text = SDL_CreateTextureFromSurface(g.renderer, sur);
+    SDL_FreeSurface(sur);
+}
 void drawGame(Game& game, Graphic& g)
 {
     SDL_RenderClear(g.renderer);
     SDL_Rect rec = {0, 0, window_width, window_height};
     SDL_RenderCopy(g.renderer, g.background, &rec, NULL);
-    bool MTP;
+    bool MTP; // if a box is empty
     int pos = 0;
     for (int i = 1; i <= boardSize; i++)
     for (int j = 1; j <= boardSize; j++)
@@ -274,6 +322,9 @@ void drawGame(Game& game, Graphic& g)
         pos = i * boardSize - (boardSize - j) - 1;
         if (MTP == 0) SDL_RenderCopy(g.renderer, g.spriteTexture, &rec, &g.winRec[pos]);
     }
+    drawScore(game.score, g);
+    SDL_RenderCopy(g.renderer, g.text, NULL, &textRec);
+    SDL_DestroyTexture(g.text);
     SDL_RenderPresent(g.renderer);
 }
 
@@ -390,9 +441,14 @@ void close(Graphic& g)
 {
     SDL_DestroyTexture(g.background);
     SDL_DestroyTexture(g.spriteTexture);
+    SDL_DestroyTexture(g.text);
     SDL_DestroyRenderer(g.renderer);
     SDL_DestroyWindow(g.Window);
+    Mix_FreeMusic(g.music);
+    TTF_CloseFont(g.font);
 
     IMG_Quit();
+    Mix_Quit();
+    TTF_Quit();
     SDL_Quit();
 }
