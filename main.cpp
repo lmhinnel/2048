@@ -7,24 +7,38 @@
 #include <vector>
 #include <string>
 #include <sstream>
+#include <fstream>
 using namespace std;
 
 // Game tutorial: Random -> Check movement -> Draw board -> Repeat. If end game, then end :>
+// Use Space to return ONE move
+
+// Const ------------------------------------------------------------------------//
 
 const int boardSize = 4; // Size of board
+
 const int spriteSize = 130; // Size of source sprite
-const int spriteWin = 100; //
+const int spriteWin = 100; // Size of Window sprite
+
 const int window_width = 500;
 const int window_height = 700;
+
 const int aRandom[] = {2, 2, 2, 2, 2, 4}; // In order to make the times random 2 more than random 4
+
 const SDL_Color White = {255, 255, 255, 255};
-const SDL_Rect textRec = {window_width / 2 - 50, window_height - 100, 100, 70};
-// const int value[] = {2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536}; // Available value of a box
+const SDL_Rect textRec = {window_width / 2 - 100, window_height - 120, 200, 70}; // Score text rec for score only
+
 const string windowTitle = "2048 super kool"; // Name of window
+
 const string backgroundPath = "bg.png"; // Background path
 const string spritePath = "sprite.png"; // Sprite path
+
 const string musicPath = "remon.ogg"; // Music path
-const string fontpath = "circle3d.ttf"; // Font path
+
+const string fontpath = "circle3d.ttf"; // Font path for score
+const string fontpath2 = "vni27.ttf"; // Font path for text play again
+
+// Struc ------------------------------------------------------------------------//
 
 struct Game
 {
@@ -34,6 +48,7 @@ struct Game
     long long score;
     int r; // A random number from aRandom to pick for a box
     vector <int> DoMove; // Step by step for each column or row
+    bool gaming; // Still wanna play
 };
 
 struct Graphic
@@ -42,48 +57,64 @@ struct Graphic
     SDL_Renderer* renderer; // To draw into Window
     SDL_Texture* background; // Background image
     SDL_Texture* spriteTexture; // Sprites image
-    Mix_Music* music;
-    TTF_Font* font;
-    SDL_Texture* text;
+    SDL_Texture* tutorial; // Game tutorial image
+    Mix_Music* music; // Game music
+    TTF_Font* font; // Game font
+    SDL_Texture* text; // Game text for both score and textEnd
     vector <SDL_Rect> spriteRec; // Sprite location in sprite.png
     vector <SDL_Rect> winRec; // Sprite location in Window
-    SDL_Event event; // Event include space to exit, up, down, left, right
+    SDL_Event event; // Event include space to undo, up, down, left, right
 };
 
-// Initial Game
-SDL_Texture* createBackground (SDL_Renderer* renderer, string path); // Turn background.png to texture
-SDL_Texture* createSprtieTexture(SDL_Renderer* renderer, string path); // Turn sprite.png to texture
+// Initial Game -----------------------------------------------------------------//
+SDL_Texture* createTexture (SDL_Renderer* renderer, string path); // Turn .png to texture
 void initSpriteRects(vector<SDL_Rect>& spriteRec, vector <SDL_Rect>& winRec); // Make spriteRec
 void err(string& m);
 
-// Create game when start a new game
+//-------------------------------------------------------------------------------//
+
+// Create game when start a new game --------------------------------------------//
+
 void RandBoard(Game& game); // <necessary>
 void createGame(Game& game); // <necessary>
 bool initGraphic(Graphic& g); // Create everything <necessary>
 
-// Draw score
-void drawScore(int& score, Graphic& g);
-// Draw board
-void drawGame(Game & game, Graphic& g); // <necessary>
+// Draw -------------------------------------------------------------------------//
 
-// Check the board if still have an available move after creating a random number
-bool GameOver(Game& game); // <necessary>
+void drawScore(long long& score, Graphic& g);// Draw score
 
-// Solving
+void drawGame(Game & game, Graphic& g); // Draw board <necessary>
+
+bool GameOver(Game& game); // Check the board if still have an available move after creating a random number <necessary>
+
+// Solving ---------------------------------------------------------------------//
+
 void StoreBoard(Game& game); // Store board into TempBoard before moving
 
 void inDoMove(vector <int>& DoMove, long long& score); // Sort each row or column in each move
-void moveU(Game& game);
-void moveD(Game& game);
-void moveL(Game& game);
-void moveR(Game& game);
+
+void moveU(Game& game); // Move up
+void moveD(Game& game); // Move down
+void moveL(Game& game); // Move left
+void moveR(Game& game); // Move right
+
+void moveUndo(Game& game); // Undo one move
 
 bool CheckMove(Game& game); // Check if after moving the board is different or not
 
-void initEvent(Game& game, SDL_Event& event); // <necessary>
+// Event ----------------------------------------------------------------------//
 
-// When end game
+void initEvent(Game& game, Graphic& g, bool& moved); // <necessary>
+
+void toolhack(Game& game, Graphic& g); // trick
+
+// When end game --------------------------------------------------------------//
+
+void textEnd (Graphic& g); // play again by pressing ENTER
 void close(Graphic& g); // Destroy everything <necessary>
+
+//-----------------------------------------------------------------------------//
+//=============================================================================//
 
 int main(int agrc, char* agrv[])
 {
@@ -96,41 +127,70 @@ int main(int agrc, char* agrv[])
         return EXIT_FAILURE;
     }
 
-    createGame(game);
-    bool moved = 1;
-    Mix_PlayMusic(g.music, -1);
-    while (true)
+    game.gaming = 1;
+    bool run = 1;
+
+    while(game.gaming)
     {
-        if(GameOver(game) == 1) break;
-        if(moved == 1)
+        createGame(game);
+        bool moved = 1;
+        Mix_PlayMusic(g.music, -1);
+        g.font = TTF_OpenFont(fontpath.c_str(), 26);
+        while (run)
         {
-            RandBoard(game);
-            moved = 0;
+            if(moved == 1) // If Board has moved then random a number for an empty box
+            {
+                RandBoard(game);
+                moved = 0;
+            }
+            drawGame(game, g); // Draw the board
+            if(GameOver(game) == 1) // If after random, there are no available move then gameover, run = 0; Ask if the player want to play again
+            {
+                run = 0;
+                break;
+            }
+            while (SDL_PollEvent(&g.event) != 0) // Analyze event
+            {
+                if (g.event.type == SDL_QUIT) // Quit game if click X button
+                {
+
+                    close(g);
+                    return 0;
+                }
+                if (g.event.type == SDL_KEYDOWN) // Solving
+                {
+                    initEvent(game, g, moved);
+                }
+            }
         }
-        drawGame(game, g);
-        while (SDL_PollEvent(&g.event) != 0)
+        while (SDL_PollEvent(&g.event) != 0) // After endgame
         {
             if (g.event.type == SDL_QUIT)
             {
-
-                close(g);
-                return 0;
+                close(g); return 0;
             }
-            if (g.event.type == SDL_KEYDOWN)
+            if (g.event.type == SDL_KEYDOWN && g.event.key.keysym.sym == SDLK_RETURN) // If wanna play again
             {
-                initEvent(game, g.event);
-                moved = CheckMove(game);
+                run = 1;
+                break;
+            }
+            if (g.event.type == SDL_KEYDOWN && g.event.key.keysym.sym == SDLK_SPACE) // If not, or can click X button
+            {
+                game.gaming = 0;
+                break;
             }
         }
+        textEnd(g); // Instruction to play agian
     }
-    SDL_Delay(2000);
-    close(g);
+    close(g); // Delay 2s then close
     return 0;
 }
 
+//-----------------------------------------------------------------------------//
+//=============================================================================//
 
-// Initial Game
-SDL_Texture* createBackground (SDL_Renderer* renderer, string path)
+
+SDL_Texture* createTexture (SDL_Renderer* renderer, string path)
 {
     SDL_Surface* sur = IMG_Load(path.c_str());
     if (sur == NULL)
@@ -143,19 +203,7 @@ SDL_Texture* createBackground (SDL_Renderer* renderer, string path)
     SDL_FreeSurface(sur);
     return tex;
 }
-SDL_Texture* createSprtieTexture(SDL_Renderer* renderer, string path)
-{
-    SDL_Surface* sur = IMG_Load(path.c_str());
-    if (sur == NULL)
-    {
-        string m = SDL_GetError();
-        err(m);
-        return NULL;
-    }
-    SDL_Texture* tex = SDL_CreateTextureFromSurface(renderer, sur);
-    SDL_FreeSurface(sur);
-    return tex;
-}
+
 void initSpriteRects(vector<SDL_Rect>& spriteRec, vector <SDL_Rect>& winRec)
 {
     SDL_Rect rec = {0, 0, spriteSize, spriteSize};
@@ -177,12 +225,14 @@ void initSpriteRects(vector<SDL_Rect>& spriteRec, vector <SDL_Rect>& winRec)
         winRec.push_back(rec);
     }
 }
+
 void err(string& m)
 {
     SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR,"ERROR", m.c_str(), NULL);
 }
 
-// Create game when start a new game
+//-----------------------------------------------------------------------------//
+
 void RandBoard(Game& game)
 {
     game.r = rand() % (boardSize * boardSize) + 1;
@@ -195,6 +245,7 @@ void RandBoard(Game& game)
     }
     game.Board[game.x][game.y] = aRandom[rand() % 6];
 }
+
 void createGame(Game& game)
 {
     for (int i = 0; i <= boardSize; i++)
@@ -205,13 +256,16 @@ void createGame(Game& game)
     }
     RandBoard(game);
     game.score = 0;
+    game.gaming = 1;
 }
+
 bool initGraphic(Graphic& g)
 {
     g.Window = NULL;
     g.renderer = NULL;
     g.background = NULL;
     g.spriteTexture = NULL;
+    g.tutorial = NULL;
     g.music = NULL;
     g.font = NULL;
     if (SDL_Init(SDL_INIT_EVERYTHING) != 0)
@@ -240,9 +294,9 @@ bool initGraphic(Graphic& g)
         err(m);
         return false;
     }
-    g.background = createBackground(g.renderer, backgroundPath);
-    g.spriteTexture = createSprtieTexture(g.renderer, spritePath);
-    if (g.background == NULL || g.spriteTexture == NULL)
+    g.background = createTexture(g.renderer, backgroundPath);
+    g.spriteTexture = createTexture(g.renderer, spritePath);
+    if (g.background == NULL || g.spriteTexture == NULL )
     {
         string m = SDL_GetError();
         err(m);
@@ -267,7 +321,7 @@ bool initGraphic(Graphic& g)
         err(m);
         return false;
     }
-    g.font = TTF_OpenFont(fontpath.c_str(), 24);
+    g.font = TTF_OpenFont(fontpath.c_str(), 26);
     if (g.font == NULL)
     {
         string m = SDL_GetError();
@@ -278,19 +332,21 @@ bool initGraphic(Graphic& g)
     return true;
 }
 
-// Draw board
+//-----------------------------------------------------------------------------//
+
 void drawScore (long long& score, Graphic& g)
 {
     SDL_Surface* sur = NULL;
-    stringstream ss; ss << score;
+    stringstream ss; ss << score; // turn score to string
     string out = "Score: " + ss.str();
     sur = TTF_RenderText_Solid(g.font, out.c_str(), White);
-    g.text = SDL_CreateTextureFromSurface(g.renderer, sur);
+    g.text = SDL_CreateTextureFromSurface(g.renderer, sur); // turn text into texture
     SDL_FreeSurface(sur);
 }
+
 void drawGame(Game& game, Graphic& g)
 {
-    SDL_RenderClear(g.renderer);
+    SDL_RenderClear(g.renderer); // Clear the reder before drawing again
     SDL_Rect rec = {0, 0, window_width, window_height};
     SDL_RenderCopy(g.renderer, g.background, &rec, NULL);
     bool MTP; // if a box is empty
@@ -319,14 +375,16 @@ void drawGame(Game& game, Graphic& g)
             case 65536:  rec = g.spriteRec[15];  break;
             default : MTP = 1;
         }
-        pos = i * boardSize - (boardSize - j) - 1;
-        if (MTP == 0) SDL_RenderCopy(g.renderer, g.spriteTexture, &rec, &g.winRec[pos]);
+        pos = i * boardSize - (boardSize - j) - 1; // position of the box in winRec[]
+        if (MTP == 0) SDL_RenderCopy(g.renderer, g.spriteTexture, &rec, &g.winRec[pos]); // cut spriteTexture into rec and then draw in Window at the position of winRec
     }
-    drawScore(game.score, g);
-    SDL_RenderCopy(g.renderer, g.text, NULL, &textRec);
-    SDL_DestroyTexture(g.text);
-    SDL_RenderPresent(g.renderer);
+    drawScore(game.score, g); // Update the score and change g.text
+    SDL_RenderCopy(g.renderer, g.text, NULL, &textRec); // Null to get full texture of text
+    SDL_DestroyTexture(g.text); // Free memory
+    SDL_RenderPresent(g.renderer); // Show on Win
 }
+
+//-----------------------------------------------------------------------------//
 
 bool GameOver(Game& game)
 {
@@ -357,7 +415,6 @@ void StoreBoard(Game& game)
 {
     for (int i = 1; i <= boardSize; i++)
         for (int j = 1; j <= boardSize; j++) game.TempBoard[i][j] = game.Board[i][j];
-
 }
 
 void inDoMove(vector <int>& DoMove, long long& score)
@@ -377,6 +434,7 @@ void inDoMove(vector <int>& DoMove, long long& score)
     }
     else DoMove.resize(4, 0);
 }
+
 void moveU(Game& game)
 {
     for (int j = 1; j <= boardSize; j++)
@@ -417,6 +475,13 @@ void moveR(Game& game)
         game.DoMove.clear();
     }
 }
+
+void moveUndo(Game& game)
+{
+    for (int i = 1; i <= boardSize; i++)
+        for (int j = 1; j <= boardSize; j++) game.Board[i][j] = game.TempBoard[i][j];
+}
+
 bool CheckMove(Game& game)
 {
     for (int i = 1; i <= boardSize; i++)
@@ -424,28 +489,62 @@ bool CheckMove(Game& game)
     return 0;
 }
 
-void initEvent(Game& game, SDL_Event& event)
+//-----------------------------------------------------------------------------//
+
+void initEvent(Game& game, Graphic& g, bool& moved)
 {
-    StoreBoard(game);
-    switch (event.key.keysym.sym)
+    switch (g.event.key.keysym.sym)
     {
-        case SDLK_UP:       moveU(game); break;
-        case SDLK_DOWN:     moveD(game); break;
-        case SDLK_LEFT:     moveL(game); break;
-        case SDLK_RIGHT:    moveR(game); break;
+        case SDLK_UP:           StoreBoard(game); moveU(game); moved = CheckMove(game); break;
+        case SDLK_DOWN:         StoreBoard(game); moveD(game); moved = CheckMove(game); break;
+        case SDLK_LEFT:         StoreBoard(game); moveL(game); moved = CheckMove(game); break;
+        case SDLK_RIGHT:        StoreBoard(game); moveR(game); moved = CheckMove(game); break;
+        case SDLK_SPACE:        if(game.score == 0) break; else { moveUndo(game); moved = 0; break; } // undo key
+        case SDLK_LCTRL:        toolhack(game, g); moved = 0; break; // tool key
         default: return;
     }
 }
 
+//-----------------------------------------------------------------------------//
+
+void toolhack(Game& game, Graphic& g)
+{
+    int k = 1;
+    for (int i = 1; i <= boardSize; i++)
+        for (int j = 1; j <= boardSize; j++) game.Board[i][j] = k*=2;
+    game.score = 9999999999;
+}
+
+//-----------------------------------------------------------------------------//
+
+void textEnd (Graphic& g)
+{
+    g.font = TTF_OpenFont(fontpath2.c_str(), 22);
+    string out = "Press ENTER to play again.";
+    SDL_Surface* sur = TTF_RenderText_Solid(g.font, out.c_str(), White);
+    g.text = SDL_CreateTextureFromSurface(g.renderer, sur);
+    SDL_FreeSurface(sur);
+
+    SDL_Rect rec = {0, window_height / 2 - 25, window_width, 25 * 2};
+    SDL_SetRenderDrawColor(g.renderer, 0, 0 , 0, 255); // set colour black
+    SDL_RenderFillRect(g.renderer, &rec); // Draw a filled rec
+    SDL_SetRenderDrawColor(g.renderer, 0, 0, 0, 0); // set colour transparent
+
+    SDL_RenderCopy(g.renderer, g.text, NULL, &rec);
+    SDL_DestroyTexture(g.text);
+    SDL_RenderPresent(g.renderer);
+}
+
 void close(Graphic& g)
 {
-    SDL_DestroyTexture(g.background);
-    SDL_DestroyTexture(g.spriteTexture);
-    SDL_DestroyTexture(g.text);
-    SDL_DestroyRenderer(g.renderer);
-    SDL_DestroyWindow(g.Window);
+    SDL_Delay(2000);
     Mix_FreeMusic(g.music);
     TTF_CloseFont(g.font);
+    SDL_DestroyTexture(g.spriteTexture);
+    SDL_DestroyTexture(g.text);
+    SDL_DestroyTexture(g.background);
+    SDL_DestroyRenderer(g.renderer);
+    SDL_DestroyWindow(g.Window);
 
     IMG_Quit();
     Mix_Quit();
