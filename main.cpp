@@ -7,7 +7,7 @@
 #include <vector>
 #include <string>
 #include <sstream>
-#include <fstream>
+
 using namespace std;
 
 // Game tutorial: Random -> Check movement -> Draw board -> Repeat. If end game, then end :>
@@ -33,7 +33,7 @@ const string windowTitle = "2048 super kool"; // Name of window
 const string backgroundPath = "bg.png"; // Background path
 const string spritePath = "sprite.png"; // Sprite path
 
-const string musicPath = "remon.ogg"; // Music path
+const string musicPath[] = {"remon.ogg", "bee.ogg", "db.ogg", "dtna.ogg"}; // Music path
 
 const string fontpath = "circle3d.ttf"; // Font path for score
 const string fontpath2 = "vni27.ttf"; // Font path for text play again
@@ -114,6 +114,9 @@ void textEnd (Graphic& g); // play again by pressing ENTER
 void close(Graphic& g); // Destroy everything <necessary>
 
 //-----------------------------------------------------------------------------//
+
+
+
 //=============================================================================//
 
 int main(int agrc, char* agrv[])
@@ -134,8 +137,23 @@ int main(int agrc, char* agrv[])
     {
         createGame(game);
         bool moved = 1;
-        Mix_PlayMusic(g.music, -1);
+
+        if (run == 1)
+        {
+            g.music = Mix_LoadMUS(musicPath[rand() % 4].c_str());
+            if(Mix_PlayMusic(g.music, -1) != 0)
+            {
+                string m; m = Mix_GetError(); err(m); break;
+            }
+        }
+        else
+        {
+            Mix_FreeMusic(g.music);
+            g.music = NULL;
+        }
+
         g.font = TTF_OpenFont(fontpath.c_str(), 26);
+
         while (run)
         {
             if(moved == 1) // If Board has moved then random a number for an empty box
@@ -144,7 +162,7 @@ int main(int agrc, char* agrv[])
                 moved = 0;
             }
             drawGame(game, g); // Draw the board
-            if(GameOver(game) == 1) // If after random, there are no available move then gameover, run = 0; Ask if the player want to play again
+            if(GameOver(game) == 1) // If after random, there are no available move then gameover, run = 0; Ask if the player wants to play again
             {
                 run = 0;
                 break;
@@ -174,20 +192,25 @@ int main(int agrc, char* agrv[])
                 run = 1;
                 break;
             }
-            if (g.event.type == SDL_KEYDOWN && g.event.key.keysym.sym == SDLK_SPACE) // If not, or can click X button
+            if (g.event.type == SDL_KEYDOWN && g.event.key.keysym.sym == SDLK_SPACE) // If not, or click X button
             {
+                run = 0;
                 game.gaming = 0;
                 break;
             }
         }
+
         textEnd(g); // Instruction to play agian
     }
     close(g); // Delay 2s then close
     return 0;
 }
 
-//-----------------------------------------------------------------------------//
 //=============================================================================//
+
+
+
+//-----------------------------------------------------------------------------//
 
 
 SDL_Texture* createTexture (SDL_Renderer* renderer, string path)
@@ -308,12 +331,15 @@ bool initGraphic(Graphic& g)
         err(m);
         return false;
     }
-    g.music = Mix_LoadMUS(musicPath.c_str()); // Create music for game
-    if (g.music == NULL)
+    for (int i = 0; i < 4; i++)
     {
-        string m = SDL_GetError();
-        err(m);
-        return false;
+        g.music = Mix_LoadMUS(musicPath[i].c_str()); // Create music for game
+        if (g.music == NULL)
+        {
+            string m = SDL_GetError();
+            err(m);
+            return false;
+        }
     }
     if (TTF_Init() != 0)
     {
@@ -545,6 +571,14 @@ void close(Graphic& g)
     SDL_DestroyTexture(g.background);
     SDL_DestroyRenderer(g.renderer);
     SDL_DestroyWindow(g.Window);
+
+    g.music = NULL;
+    g.font = NULL;
+    g.spriteTexture = NULL;
+    g.text = NULL;
+    g.background = NULL;
+    g.renderer = NULL;
+    g.Window = NULL;
 
     IMG_Quit();
     Mix_Quit();
