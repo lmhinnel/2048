@@ -44,6 +44,7 @@ struct Game
 {
     int Board[boardSize + 1][boardSize + 1]; // A square board from 1 to 4
     int TempBoard[boardSize + 1][boardSize + 1]; // Store the board before doing move
+    int PrevBoard[boardSize + 1][boardSize + 1]; // Store the previous board in order to use undo move
     int x, y; // Location of a box in Board
     long long score;
     int r; // A random number from aRandom to pick for a box
@@ -90,6 +91,7 @@ bool GameOver(Game& game); // Check the board if still have an available move af
 // Solving ---------------------------------------------------------------------//
 
 void StoreBoard(Game& game); // Store board into TempBoard before moving
+void SavePreBoard(Game& game); // Store previous board
 
 void inDoMove(vector <int>& DoMove, long long& score); // Sort each row or column in each move
 
@@ -158,6 +160,7 @@ int main(int agrc, char* agrv[])
         {
             if(moved == 1) // If Board has moved then random a number for an empty box
             {
+                SavePreBoard(game);
                 RandBoard(game);
                 moved = 0;
             }
@@ -276,6 +279,7 @@ void createGame(Game& game)
     {
         game.Board[i][j] = 0;
         game.TempBoard[i][j] = 0;
+        game.PrevBoard[i][j] = 0;
     }
     RandBoard(game);
     game.score = 0;
@@ -443,6 +447,12 @@ void StoreBoard(Game& game)
         for (int j = 1; j <= boardSize; j++) game.TempBoard[i][j] = game.Board[i][j];
 }
 
+void SavePreBoard(Game& game)
+{
+    for (int i = 1; i <= boardSize; i++)
+        for (int j = 1; j <= boardSize; j++) game.PrevBoard[i][j] = game.TempBoard[i][j];
+}
+
 void inDoMove(vector <int>& DoMove, long long& score)
 {
     if (DoMove.size() >= 2)
@@ -505,7 +515,7 @@ void moveR(Game& game)
 void moveUndo(Game& game)
 {
     for (int i = 1; i <= boardSize; i++)
-        for (int j = 1; j <= boardSize; j++) game.Board[i][j] = game.TempBoard[i][j];
+        for (int j = 1; j <= boardSize; j++) game.Board[i][j] = game.PrevBoard[i][j];
 }
 
 bool CheckMove(Game& game)
