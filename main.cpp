@@ -38,7 +38,7 @@ const string musicPath[] = {"remon.ogg", "bee.ogg", "db.ogg", "dtna.ogg"}; // Mu
 const string fontpath = "circle3d.ttf"; // Font path for score
 const string fontpath2 = "vni27.ttf"; // Font path for text play again
 
-// Struc ------------------------------------------------------------------------//
+// Struct -----------------------------------------------------------------------//
 
 struct Game
 {
@@ -47,6 +47,8 @@ struct Game
     int PrevBoard[boardSize + 1][boardSize + 1]; // Store the previous board in order to use undo move
     int x, y; // Location of a box in Board
     long long score;
+    long long tmpscore;
+    long long prevscore;
     int r; // A random number from aRandom to pick for a box
     vector <int> DoMove; // Step by step for each column or row
     bool gaming; // Still wanna play
@@ -205,7 +207,7 @@ int main(int agrc, char* agrv[])
 
         textEnd(g); // Instruction to play agian
     }
-    close(g); // Delay 2s then close
+    close(g); // Delay 1s then close
     return 0;
 }
 
@@ -241,7 +243,9 @@ void initSpriteRects(vector<SDL_Rect>& spriteRec, vector <SDL_Rect>& winRec)
         rec.y = i;
         spriteRec.push_back(rec);
     }
+
     rec = {0, 0, spriteWin, spriteWin};
+
     int space = (window_width - boardSize * spriteWin) / 2;
     for (int i = space; i < window_width - space; i += spriteWin)
     for (int j = space; j < window_width - space; j += spriteWin)
@@ -263,12 +267,14 @@ void RandBoard(Game& game)
 {
     game.r = rand() % (boardSize * boardSize) + 1;
     game.x = (game.r - 1) / boardSize + 1; game.y = (game.r - 1) % boardSize + 1;
+
     while (game.Board[game.x][game.y] != 0)
     {
         game.r = rand() % (boardSize * boardSize) + 1;
         game.x = (game.r - 1) / boardSize + 1;
         game.y = (game.r - 1) % boardSize + 1;
     }
+
     game.Board[game.x][game.y] = aRandom[rand() % 6];
 }
 
@@ -281,8 +287,11 @@ void createGame(Game& game)
         game.TempBoard[i][j] = 0;
         game.PrevBoard[i][j] = 0;
     }
+
     RandBoard(game);
     game.score = 0;
+    game.tmpscore = 0;
+    game.prevscore = 0;
     game.gaming = 1;
 }
 
@@ -295,46 +304,56 @@ bool initGraphic(Graphic& g)
     g.tutorial = NULL;
     g.music = NULL;
     g.font = NULL;
+
     if (SDL_Init(SDL_INIT_EVERYTHING) != 0)
     {
         string m = SDL_GetError();
         err(m);
         return false;
     }
+
     if(!(IMG_Init(IMG_INIT_PNG) & IMG_INIT_PNG))
     {
         string m = SDL_GetError();
         err(m);
         return false;
     }
+
     g.Window = SDL_CreateWindow(windowTitle.c_str(),SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, window_width, window_height, SDL_WINDOW_SHOWN);
+
     if (g.Window == NULL)
     {
         string m = SDL_GetError();
         err(m);
         return false;
     }
+
     g.renderer = SDL_CreateRenderer(g.Window, - 1, SDL_RENDERER_ACCELERATED);
+
     if (g.renderer == NULL)
     {
         string m = SDL_GetError();
         err(m);
         return false;
     }
+
     g.background = createTexture(g.renderer, backgroundPath);
     g.spriteTexture = createTexture(g.renderer, spritePath);
+
     if (g.background == NULL || g.spriteTexture == NULL )
     {
         string m = SDL_GetError();
         err(m);
         return false;
     }
+
     if (Mix_OpenAudio(MIX_DEFAULT_FREQUENCY, MIX_DEFAULT_FORMAT, MIX_DEFAULT_CHANNELS, 4096) != 0) // Open audio
     {
         string m = SDL_GetError();
         err(m);
         return false;
     }
+
     for (int i = 0; i < 4; i++)
     {
         g.music = Mix_LoadMUS(musicPath[i].c_str()); // Create music for game
@@ -345,20 +364,25 @@ bool initGraphic(Graphic& g)
             return false;
         }
     }
+
     if (TTF_Init() != 0)
     {
         string m = SDL_GetError();
         err(m);
         return false;
     }
+
     g.font = TTF_OpenFont(fontpath.c_str(), 26);
+
     if (g.font == NULL)
     {
         string m = SDL_GetError();
         err(m);
         return false;
     }
+
     initSpriteRects(g.spriteRec, g.winRec);
+
     return true;
 }
 
@@ -367,20 +391,25 @@ bool initGraphic(Graphic& g)
 void drawScore (long long& score, Graphic& g)
 {
     SDL_Surface* sur = NULL;
+
     stringstream ss; ss << score; // turn score to string
     string out = "Score: " + ss.str();
-    sur = TTF_RenderText_Solid(g.font, out.c_str(), White);
+
+    sur = TTF_RenderText_Solid(g.font, out.c_str(), White); // create text from surface
     g.text = SDL_CreateTextureFromSurface(g.renderer, sur); // turn text into texture
+
     SDL_FreeSurface(sur);
 }
 
 void drawGame(Game& game, Graphic& g)
 {
-    SDL_RenderClear(g.renderer); // Clear the reder before drawing again
+    SDL_RenderClear(g.renderer); // Clear the render before drawing again
     SDL_Rect rec = {0, 0, window_width, window_height};
-    SDL_RenderCopy(g.renderer, g.background, &rec, NULL);
+    SDL_RenderCopy(g.renderer, g.background, &rec, NULL); // draw background
+
     bool MTP; // if a box is empty
     int pos = 0;
+
     for (int i = 1; i <= boardSize; i++)
     for (int j = 1; j <= boardSize; j++)
     {
@@ -408,6 +437,7 @@ void drawGame(Game& game, Graphic& g)
         pos = i * boardSize - (boardSize - j) - 1; // position of the box in winRec[]
         if (MTP == 0) SDL_RenderCopy(g.renderer, g.spriteTexture, &rec, &g.winRec[pos]); // cut spriteTexture into rec and then draw in Window at the position of winRec
     }
+
     drawScore(game.score, g); // Update the score and change g.text
     SDL_RenderCopy(g.renderer, g.text, NULL, &textRec); // Null to get full texture of text
     SDL_DestroyTexture(g.text); // Free memory
@@ -423,9 +453,7 @@ bool GameOver(Game& game)
     {
         for (int j = 1; j <= boardSize; j++)
         if (game.Board[i][j] == 0) // If this box is empty then the board is not full yet, return GameOver = False
-        {
             return false;
-        }
     }
     // Check if there are two boxes have a same number when the board is full
     for (int i = boardSize; i >= 1; i--)
@@ -433,11 +461,10 @@ bool GameOver(Game& game)
         for (int j = boardSize; j >= 1; j--)
         {
             if (game.Board[i][j] == game.Board[i - 1][j] || game.Board[i][j] == game.Board[i][j - 1])
-            {
                 return false;
-            }
         }
     }
+
     return true;
 }
 
@@ -445,12 +472,14 @@ void StoreBoard(Game& game)
 {
     for (int i = 1; i <= boardSize; i++)
         for (int j = 1; j <= boardSize; j++) game.TempBoard[i][j] = game.Board[i][j];
+    game.tmpscore = game.score;
 }
 
 void SavePreBoard(Game& game)
 {
     for (int i = 1; i <= boardSize; i++)
         for (int j = 1; j <= boardSize; j++) game.PrevBoard[i][j] = game.TempBoard[i][j];
+    game.prevscore = game.tmpscore;
 }
 
 void inDoMove(vector <int>& DoMove, long long& score)
@@ -459,16 +488,18 @@ void inDoMove(vector <int>& DoMove, long long& score)
     {
         if (DoMove.size() < boardSize) DoMove.resize(boardSize, 0);
         for (int i = 0; i < DoMove.size(); i++)
-        if (DoMove[i] == 0) break;
-        else if (DoMove[i] == DoMove[i + 1])
         {
-            DoMove[i] *= 2;
-            score += DoMove[i];
-            DoMove.push_back(0);
-            DoMove.erase(DoMove.begin() + i + 1);
+            if (DoMove[i] == 0) break; // When those number after i is 0, break;
+            else if (DoMove[i] == DoMove[i + 1])
+            {
+                DoMove[i] *= 2;
+                score += DoMove[i];
+                DoMove.push_back(0); // Keep DoMove always have 4 numbers
+                DoMove.erase(DoMove.begin() + i + 1);
+            }
         }
     }
-    else DoMove.resize(4, 0);
+    else DoMove.resize(4, 0); // If DoMove have less than 2 numbers, there is no need to do sum or move
 }
 
 void moveU(Game& game)
@@ -516,6 +547,7 @@ void moveUndo(Game& game)
 {
     for (int i = 1; i <= boardSize; i++)
         for (int j = 1; j <= boardSize; j++) game.Board[i][j] = game.PrevBoard[i][j];
+    game.score = game.prevscore;
 }
 
 bool CheckMove(Game& game)
@@ -535,7 +567,7 @@ void initEvent(Game& game, Graphic& g, bool& moved)
         case SDLK_DOWN:         StoreBoard(game); moveD(game); moved = CheckMove(game); break;
         case SDLK_LEFT:         StoreBoard(game); moveL(game); moved = CheckMove(game); break;
         case SDLK_RIGHT:        StoreBoard(game); moveR(game); moved = CheckMove(game); break;
-        case SDLK_SPACE:        if(game.score == 0) break; else { moveUndo(game); moved = 0; break; } // undo key
+        case SDLK_SPACE:        if (game.score == 0) break; else { moveUndo(game); moved = 0; break; } // undo key
         case SDLK_LCTRL:        toolhack(game, g); moved = 0; break; // tool key
         default: return;
     }
@@ -547,7 +579,7 @@ void toolhack(Game& game, Graphic& g)
 {
     int k = 1;
     for (int i = 1; i <= boardSize; i++)
-        for (int j = 1; j <= boardSize; j++) game.Board[i][j] = k*=2;
+        for (int j = 1; j <= boardSize; j++) game.Board[i][j] = (k*=2);
     game.score = 9999999999;
 }
 
@@ -571,9 +603,11 @@ void textEnd (Graphic& g)
     SDL_RenderPresent(g.renderer);
 }
 
+//-----------------------------------------------------------------------------//
+
 void close(Graphic& g)
 {
-    SDL_Delay(2000);
+    SDL_Delay(1000);
     Mix_FreeMusic(g.music);
     TTF_CloseFont(g.font);
     SDL_DestroyTexture(g.spriteTexture);
