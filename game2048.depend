@@ -1,5 +1,5 @@
 # depslib dependency file v1.0
-1588777735 source:c:\users\admin\desktop\game2048\main.cpp
+1590602380 source:c:\users\admin\desktop\game2048\main.cpp
 	<SDL.h>
 	<SDL_image.h>
 	<SDL_mixer.h>
@@ -9,6 +9,8 @@
 	<vector>
 	<string>
 	<sstream>
+	<fstream>
+	<iostream>
 
 1583890677 c:\program files (x86)\codeblocks\sdl2-2.0.12\i686-w64-mingw32\include\sdl2\sdl.h
 	"SDL_main.h"

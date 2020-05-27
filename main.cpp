@@ -7,6 +7,8 @@
 #include <vector>
 #include <string>
 #include <sstream>
+#include <fstream>
+#include <iostream>
 
 using namespace std;
 
@@ -38,6 +40,8 @@ const string musicPath[] = {"remon.ogg", "bee.ogg", "db.ogg", "dtna.ogg"}; // Mu
 const string fontpath = "circle3d.ttf"; // Font path for score
 const string fontpath2 = "vni27.ttf"; // Font path for text play again
 
+const string high_score_path = "highscore.txt";
+
 // Struct -----------------------------------------------------------------------//
 
 struct Game
@@ -45,28 +49,45 @@ struct Game
     int Board[boardSize + 1][boardSize + 1]; // A square board from 1 to 4
     int TempBoard[boardSize + 1][boardSize + 1]; // Store the board before doing move
     int PrevBoard[boardSize + 1][boardSize + 1]; // Store the previous board in order to use undo move
+
     int x, y; // Location of a box in Board
+
     long long score;
     long long tmpscore;
     long long prevscore;
+
     int r; // A random number from aRandom to pick for a box
+
     vector <int> DoMove; // Step by step for each column or row
+
     bool gaming; // Still wanna play
 };
 
 struct Graphic
 {
     SDL_Window* Window; // Window
+
     SDL_Renderer* renderer; // To draw into Window
+
     SDL_Texture* background; // Background image
     SDL_Texture* spriteTexture; // Sprites image
-    SDL_Texture* tutorial; // Game tutorial image
+
     Mix_Music* music; // Game music
+
     TTF_Font* font; // Game font
+
     SDL_Texture* text; // Game text for both score and textEnd
+
     vector <SDL_Rect> spriteRec; // Sprite location in sprite.png
     vector <SDL_Rect> winRec; // Sprite location in Window
+
     SDL_Event event; // Event include space to undo, up, down, left, right
+};
+
+struct HighScore
+{
+    int top5 = 5;
+    long long score[5];
 };
 
 // Initial Game -----------------------------------------------------------------//
@@ -79,7 +100,7 @@ void err(string& m);
 // Create game when start a new game --------------------------------------------//
 
 void RandBoard(Game& game); // <necessary>
-void createGame(Game& game); // <necessary>
+void createGame(Game& game, HighScore& highscore); // <necessary>
 bool initGraphic(Graphic& g); // Create everything <necessary>
 
 // Draw -------------------------------------------------------------------------//
@@ -97,10 +118,10 @@ void SavePreBoard(Game& game); // Store previous board
 
 void inDoMove(vector <int>& DoMove, long long& score); // Sort each row or column in each move
 
-void moveU(Game& game); // Move up
-void moveD(Game& game); // Move down
-void moveL(Game& game); // Move left
-void moveR(Game& game); // Move right
+void moveU(Game& game, Graphic& g); // Move up
+void moveD(Game& game, Graphic& g); // Move down
+void moveL(Game& game, Graphic& g); // Move left
+void moveR(Game& game, Graphic& g); // Move right
 
 void moveUndo(Game& game); // Undo one move
 
@@ -114,7 +135,8 @@ void toolhack(Game& game, Graphic& g); // trick
 
 // When end game --------------------------------------------------------------//
 
-void textEnd (Graphic& g); // play again by pressing ENTER
+void highBoard (Graphic& g, HighScore& hs); // Draw high score board
+void textEnd (Graphic& g, long long& score, HighScore& hs); // play again by pressing ENTER
 void close(Graphic& g); // Destroy everything <necessary>
 
 //-----------------------------------------------------------------------------//
@@ -123,10 +145,12 @@ void close(Graphic& g); // Destroy everything <necessary>
 
 //=============================================================================//
 
+
 int main(int agrc, char* agrv[])
 {
     Game game;
     Graphic g;
+    HighScore highscore;
     srand(time(NULL));
     if (!initGraphic(g))
     {
@@ -135,15 +159,16 @@ int main(int agrc, char* agrv[])
     }
 
     game.gaming = 1;
-    bool run = 1;
+    bool run = 1, drawed = 1;;
 
     while(game.gaming)
     {
-        createGame(game);
         bool moved = 1;
 
         if (run == 1)
         {
+            drawed = 1;
+            createGame(game, highscore);
             g.music = Mix_LoadMUS(musicPath[rand() % 4].c_str());
             if(Mix_PlayMusic(g.music, -1) != 0)
             {
@@ -176,7 +201,6 @@ int main(int agrc, char* agrv[])
             {
                 if (g.event.type == SDL_QUIT) // Quit game if click X button
                 {
-
                     close(g);
                     return 0;
                 }
@@ -184,6 +208,7 @@ int main(int agrc, char* agrv[])
                 {
                     initEvent(game, g, moved);
                 }
+                if (moved == 1) break;
             }
         }
         while (SDL_PollEvent(&g.event) != 0) // After endgame
@@ -205,7 +230,12 @@ int main(int agrc, char* agrv[])
             }
         }
 
-        textEnd(g); // Instruction to play agian
+        if (game.score == 9999999999) game.score = 0;
+        if (drawed == 1)
+        {
+            textEnd(g, game.score, highscore); // Instruction to play agian
+            drawed = 0;
+        }
     }
     close(g); // Delay 1s then close
     return 0;
@@ -278,7 +308,7 @@ void RandBoard(Game& game)
     game.Board[game.x][game.y] = aRandom[rand() % 6];
 }
 
-void createGame(Game& game)
+void createGame(Game& game, HighScore& highscore)
 {
     for (int i = 0; i <= boardSize; i++)
         for (int j = 0; j <= boardSize; j++)
@@ -293,6 +323,20 @@ void createGame(Game& game)
     game.tmpscore = 0;
     game.prevscore = 0;
     game.gaming = 1;
+
+    //Load Top 5 High score
+    ifstream hs (high_score_path);
+
+    if (hs)
+    {
+        for (int i = 0; i < highscore.top5; i++) hs >> highscore.score[i];
+        hs.close();
+    }
+    else
+    {
+        string m = "Bug fstream";
+        err(m);
+    }
 }
 
 bool initGraphic(Graphic& g)
@@ -301,7 +345,6 @@ bool initGraphic(Graphic& g)
     g.renderer = NULL;
     g.background = NULL;
     g.spriteTexture = NULL;
-    g.tutorial = NULL;
     g.music = NULL;
     g.font = NULL;
 
@@ -482,64 +525,149 @@ void SavePreBoard(Game& game)
     game.prevscore = game.tmpscore;
 }
 
-void inDoMove(vector <int>& DoMove, long long& score)
+//-----------------------------------------------------------------------------//
+
+void moveU(Game& game, Graphic& g)
 {
-    if (DoMove.size() >= 2)
+    int canMove = true;
+    bool canPlus[5][5];
+    for (int i = 1; i <= boardSize; i++)
+    for (int j = 1; j <= boardSize; j++)
+            canPlus[i][j] = true;
+    while(canMove)
     {
-        if (DoMove.size() < boardSize) DoMove.resize(boardSize, 0);
-        for (int i = 0; i < DoMove.size(); i++)
+        canMove = false;
+        for (int i = 2; i <= boardSize; i++)
+        for (int j = 1; j <= boardSize; j++)
         {
-            if (DoMove[i] == 0) break; // When those number after i is 0, break;
-            else if (DoMove[i] == DoMove[i + 1])
+            if (game.Board[i][j] == 0)  continue;
+
+            if (game.Board[i - 1][j] == 0)
             {
-                DoMove[i] *= 2;
-                score += DoMove[i];
-                DoMove.push_back(0); // Keep DoMove always have 4 numbers
-                DoMove.erase(DoMove.begin() + i + 1);
+                game.Board[i - 1][j] = game.Board[i][j];
+                game.Board[i][j] = 0;
+                canMove = true;
+            }
+            else
+            if (game.Board[i - 1][j] == game.Board[i][j] && canPlus[i - 1][j] == true && canPlus[i][j] == true)
+            {
+                game.Board[i - 1][j] *= 2;
+                game.score += game.Board[i - 1][j];
+                game.Board[i][j] = 0;
+                canPlus[i - 1][j] = false;
+                canMove = true;
             }
         }
+        drawGame(game, g);
+        SDL_Delay(30);
     }
-    else DoMove.resize(4, 0); // If DoMove have less than 2 numbers, there is no need to do sum or move
 }
 
-void moveU(Game& game)
+void moveD(Game& game, Graphic& g)
 {
-    for (int j = 1; j <= boardSize; j++)
-    {
-        for (int i = 1; i <= boardSize; i++) if (game.Board[i][j] != 0) game.DoMove.push_back(game.Board[i][j]);
-        inDoMove(game.DoMove, game.score);
-        for (int i = 1; i <= boardSize; i++) game.Board[i][j] = game.DoMove[i - 1];
-        game.DoMove.clear();
-    }
-}
-void moveD(Game& game)
-{
-    for (int j = 1; j <= boardSize; j++)
-    {
-        for (int i = boardSize; i >= 1; i--) if (game.Board[i][j] != 0) game.DoMove.push_back(game.Board[i][j]);
-        inDoMove(game.DoMove, game.score);
-        for (int i = boardSize; i >= 1; i--) game.Board[i][j] = game.DoMove[4 - i];
-        game.DoMove.clear();
-    }
-}
-void moveL(Game& game)
-{
+    int canMove = true;
+    bool canPlus[5][5];
     for (int i = 1; i <= boardSize; i++)
+    for (int j = 1; j <= boardSize; j++)
+            canPlus[i][j] = true;
+    while(canMove)
     {
-        for (int j = 1; j <= boardSize; j++) if (game.Board[i][j] != 0) game.DoMove.push_back(game.Board[i][j]);
-        inDoMove(game.DoMove, game.score);
-        for (int j = 1; j <= boardSize; j++) game.Board[i][j] = game.DoMove[j - 1];
-        game.DoMove.clear();
+        canMove = false;
+        for (int i = boardSize - 1; i >= 1; i--)
+        for (int j = 1; j <= boardSize; j++)
+        {
+            if (game.Board[i][j] == 0)  continue;
+
+            if (game.Board[i + 1][j] == 0)
+            {
+                game.Board[i + 1][j] = game.Board[i][j];
+                game.Board[i][j] = 0;
+                canMove = true;
+            }
+            else
+            if (game.Board[i + 1][j] == game.Board[i][j] && canPlus[i + 1][j] == true && canPlus[i][j] == true)
+            {
+                game.Board[i + 1][j] *= 2;
+                game.score += game.Board[i + 1][j];
+                game.Board[i][j] = 0;
+                canPlus[i + 1][j] = false;
+                canMove = true;
+            }
+        }
+        drawGame(game, g);
+        SDL_Delay(30);
     }
 }
-void moveR(Game& game)
+
+void moveL(Game& game, Graphic& g)
 {
+    int canMove = true;
+    bool canPlus[5][5];
     for (int i = 1; i <= boardSize; i++)
+    for (int j = 1; j <= boardSize; j++)
+            canPlus[i][j] = true;
+    while(canMove)
     {
-        for (int j = boardSize; j >= 1; j--) if (game.Board[i][j] != 0) game.DoMove.push_back(game.Board[i][j]);
-        inDoMove(game.DoMove, game.score);
-        for (int j = boardSize; j >= 1; j--) game.Board[i][j] = game.DoMove[boardSize - j];
-        game.DoMove.clear();
+        canMove = false;
+        for (int j = 2; j <= boardSize; j++)
+        for (int i = 1; i <= boardSize; i++)
+        {
+            if (game.Board[i][j] == 0)  continue;
+
+            if (game.Board[i][j - 1] == 0)
+            {
+                game.Board[i][j - 1] = game.Board[i][j];
+                game.Board[i][j] = 0;
+                canMove = true;
+            }
+            else
+            if (game.Board[i][j - 1] == game.Board[i][j] && canPlus[i][j - 1] == true && canPlus[i][j] == true)
+            {
+                game.Board[i][j - 1] *= 2;
+                game.score += game.Board[i][j - 1];
+                game.Board[i][j] = 0;
+                canPlus[i][j - 1] = false;
+                canMove = true;
+            }
+        }
+        drawGame(game, g);
+        SDL_Delay(30);
+    }
+}
+
+void moveR(Game& game, Graphic& g)
+{
+    int canMove = true;
+    bool canPlus[5][5];
+    for (int i = 1; i <= boardSize; i++)
+    for (int j = 1; j <= boardSize; j++)
+            canPlus[i][j] = true;
+    while(canMove)
+    {
+        canMove = false;
+        for (int j = boardSize - 1; j >= 1; j--)
+        for (int i = 1; i <= boardSize; i++)
+        {
+            if (game.Board[i][j] == 0)  continue;
+
+            if (game.Board[i][j + 1] == 0)
+            {
+                game.Board[i][j + 1] = game.Board[i][j];
+                game.Board[i][j] = 0;
+                canMove = true;
+            }
+            else
+            if (game.Board[i][j + 1] == game.Board[i][j] && canPlus[i][j + 1] == true && canPlus[i][j] == true)
+            {
+                game.Board[i][j + 1] *= 2;
+                game.score += game.Board[i][j + 1];
+                game.Board[i][j] = 0;
+                canPlus[i][j + 1] = false;
+                canMove = true;
+            }
+        }
+        drawGame(game, g);
+        SDL_Delay(30);
     }
 }
 
@@ -563,11 +691,11 @@ void initEvent(Game& game, Graphic& g, bool& moved)
 {
     switch (g.event.key.keysym.sym)
     {
-        case SDLK_UP:           StoreBoard(game); moveU(game); moved = CheckMove(game); break;
-        case SDLK_DOWN:         StoreBoard(game); moveD(game); moved = CheckMove(game); break;
-        case SDLK_LEFT:         StoreBoard(game); moveL(game); moved = CheckMove(game); break;
-        case SDLK_RIGHT:        StoreBoard(game); moveR(game); moved = CheckMove(game); break;
-        case SDLK_SPACE:        if (game.score == 0) break; else { moveUndo(game); moved = 0; break; } // undo key
+        case SDLK_UP:           StoreBoard(game); moveU(game, g);   moved = CheckMove(game); break;
+        case SDLK_DOWN:         StoreBoard(game); moveD(game, g);   moved = CheckMove(game); break;
+        case SDLK_LEFT:         StoreBoard(game); moveL(game, g);   moved = CheckMove(game); break;
+        case SDLK_RIGHT:        StoreBoard(game); moveR(game, g);   moved = CheckMove(game); break;
+        case SDLK_SPACE:        if (game.score == 0) break; else {moveUndo(game); moved = 0; break; } // undo key
         case SDLK_LCTRL:        toolhack(game, g); moved = 0; break; // tool key
         default: return;
     }
@@ -585,7 +713,36 @@ void toolhack(Game& game, Graphic& g)
 
 //-----------------------------------------------------------------------------//
 
-void textEnd (Graphic& g)
+void highBoard (Graphic& g, HighScore& hs)
+{
+    g.font = TTF_OpenFont(fontpath2.c_str(), 22);
+    string out;
+    SDL_Surface* sur;
+    SDL_Rect rec;
+    SDL_SetRenderDrawColor(g.renderer, 0, 0 , 0, 100); // set colour black
+    for (int i = 0; i < hs.top5; i++)
+    {
+        ostringstream convert;
+        convert << hs.score[i];
+        out = convert.str();
+        cout << out << endl;
+
+        rec = {150, (i + 1)* 100 , window_width - 300, 40};
+        if (hs.score[i] < 10000) rec = {170, (i + 1)* 100 , window_width - 340, 40};
+        if (hs.score[i] < 1000)  rec = {190, (i + 1)* 100 , window_width - 380, 40};
+        SDL_RenderFillRect(g.renderer, &rec); // Draw a filled rec
+
+        sur = TTF_RenderText_Solid(g.font, out.c_str(), White);
+        g.text = SDL_CreateTextureFromSurface(g.renderer, sur);
+
+        SDL_RenderCopy(g.renderer, g.text, NULL, &rec);
+        SDL_DestroyTexture(g.text);
+    }
+    SDL_SetRenderDrawColor(g.renderer, 0, 0, 0, 0); // set colour transparent
+    SDL_FreeSurface(sur);
+}
+
+void textEnd (Graphic& g, long long& score, HighScore& hs)
 {
     g.font = TTF_OpenFont(fontpath2.c_str(), 22);
     string out = "Press ENTER to play again.";
@@ -593,13 +750,35 @@ void textEnd (Graphic& g)
     g.text = SDL_CreateTextureFromSurface(g.renderer, sur);
     SDL_FreeSurface(sur);
 
-    SDL_Rect rec = {0, window_height / 2 - 25, window_width, 25 * 2};
+    SDL_Rect rec = {0, 0, window_width, 25 * 2};
     SDL_SetRenderDrawColor(g.renderer, 0, 0 , 0, 255); // set colour black
     SDL_RenderFillRect(g.renderer, &rec); // Draw a filled rec
     SDL_SetRenderDrawColor(g.renderer, 0, 0, 0, 0); // set colour transparent
 
     SDL_RenderCopy(g.renderer, g.text, NULL, &rec);
     SDL_DestroyTexture(g.text);
+
+    for (int i = 0; i < hs.top5; i++)
+    if (hs.score[i] <= score)
+    {
+        for (int j = hs.top5 - 1; j > i; j--) hs.score[j] = hs.score[j - 1];
+        hs.score[i] = score;
+        break;
+    }
+
+    ofstream outs (high_score_path);
+    if (outs)
+    {
+        outs.clear();
+        for (int i = 0; i < hs.top5; i++) outs << hs.score[i] << endl;
+        outs.close();
+    }
+    else
+    {
+        string m = "Bug fstream";
+        err(m);
+    }
+    highBoard(g, hs);
     SDL_RenderPresent(g.renderer);
 }
 
@@ -607,7 +786,7 @@ void textEnd (Graphic& g)
 
 void close(Graphic& g)
 {
-    SDL_Delay(1000);
+    SDL_Delay(500);
     Mix_FreeMusic(g.music);
     TTF_CloseFont(g.font);
     SDL_DestroyTexture(g.spriteTexture);
