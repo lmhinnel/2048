@@ -8,7 +8,6 @@
 #include <string>
 #include <sstream>
 #include <fstream>
-#include <iostream>
 
 using namespace std;
 
@@ -131,12 +130,12 @@ bool CheckMove(Game& game); // Check if after moving the board is different or n
 
 void initEvent(Game& game, Graphic& g, bool& moved); // <necessary>
 
-void toolhack(Game& game, Graphic& g); // trick
+void toolhack(Game& game, Graphic& g); // Trick
 
 // When end game --------------------------------------------------------------//
 
 void highBoard (Graphic& g, HighScore& hs); // Draw high score board
-void textEnd (Graphic& g, long long& score, HighScore& hs); // play again by pressing ENTER
+void textEnd (Graphic& g, long long& score, HighScore& hs); // Play again by pressing ENTER
 void close(Graphic& g); // Destroy everything <necessary>
 
 //-----------------------------------------------------------------------------//
@@ -719,17 +718,23 @@ void highBoard (Graphic& g, HighScore& hs)
     string out;
     SDL_Surface* sur;
     SDL_Rect rec;
-    SDL_SetRenderDrawColor(g.renderer, 0, 0 , 0, 100); // set colour black
+
     for (int i = 0; i < hs.top5; i++)
     {
         ostringstream convert;
         convert << hs.score[i];
         out = convert.str();
-        cout << out << endl;
+
+        if (i == 0) SDL_SetRenderDrawColor(g.renderer, 25, 25, 112, 255); // Midnight Blue
+        else if (i == 1) SDL_SetRenderDrawColor(g.renderer, 0, 139, 139, 255); // Dark Cyan
+        else if (i == 2) SDL_SetRenderDrawColor(g.renderer, 46, 139, 87, 255); // Sea Green
+        else if (i == 3) SDL_SetRenderDrawColor(g.renderer, 255, 210, 0, 255); // Gold
+        else SDL_SetRenderDrawColor(g.renderer, 220, 20, 60, 255); // Crimson
 
         rec = {150, (i + 1)* 100 , window_width - 300, 40};
-        if (hs.score[i] < 10000) rec = {170, (i + 1)* 100 , window_width - 340, 40};
-        if (hs.score[i] < 1000)  rec = {190, (i + 1)* 100 , window_width - 380, 40};
+        if (hs.score[i] < 10000) rec = {175, (i + 1)* 100 , window_width - 350, 40};
+        if (hs.score[i] < 1000)  rec = {195, (i + 1)* 100 , window_width - 390, 40};
+        if (hs.score[i] < 10)    rec = {235, (i + 1)* 100 , window_width - 470, 40};
         SDL_RenderFillRect(g.renderer, &rec); // Draw a filled rec
 
         sur = TTF_RenderText_Solid(g.font, out.c_str(), White);
